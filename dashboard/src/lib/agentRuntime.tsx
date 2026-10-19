@@ -1,3 +1,4 @@
+
 /**
  * Where the dashboard's `@stellaragent/react` hooks get their agent.
  *
@@ -16,6 +17,7 @@
  * configuration.
  */
 
+import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { StellarAgent, type ContractAddresses, type Network } from '@stellaragent/core';
 import { StellarAgentProvider } from '@stellaragent/react';
@@ -60,9 +62,11 @@ export function hasContractConfiguration(): boolean {
 export const AGENT_CONFIG = {
   network: AGENT_NETWORK,
   contracts: configuredContracts(),
-  // Read-only dashboard: no secret key, so there is nothing to leak or to
-  // accidentally spend. `allowUnconfiguredContracts` keeps `create()` from
-  // throwing before the page can render its own "not configured" guidance.
+  // Read-only dashboard: no `Signer` is supplied, so `holds_secret_key` is
+  // false and there is nothing to leak or to accidentally spend. The Signer
+  // abstraction (KeypairSigner / RemoteSigner) is intentionally unused here.
+  // `allowUnconfiguredContracts` keeps `create()` from throwing before the
+  // page can render its own "not configured" guidance.
   allowUnconfiguredContracts: true,
 } as const;
 
@@ -71,7 +75,7 @@ function injectedAgent(): StellarAgent | undefined {
 }
 
 export function DashboardAgentProvider({ children }: { children: ReactNode }) {
-  const agent = injectedAgent();
+  const agent = useMemo(() => injectedAgent(), []);
   return (
     <StellarAgentProvider config={AGENT_CONFIG} {...(agent ? { agent } : {})}>
       {children}

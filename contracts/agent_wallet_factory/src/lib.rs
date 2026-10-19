@@ -24,15 +24,17 @@ pub struct AgentInfo {
     pub total_ops: u64,
 }
 
-/// Events emitted by this contract
-#[contracttype]
-pub enum Event {
-    Created,
-    Deactivated,
-    Reactivated,
-}
-
 // ─── Contract ────────────────────────────────────────────────────────────────
+
+
+pub const DAY_IN_LEDGERS: u32 = 17280;
+pub const INSTANCE_BUMP_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const INSTANCE_LIFETIME_THRESHOLD: u32 = 7 * DAY_IN_LEDGERS;
+
+
+pub fn extend_instance_ttl(env: &Env) {
+    env.storage().instance().extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+}
 
 #[contract]
 pub struct AgentWalletFactory;
@@ -44,6 +46,7 @@ impl AgentWalletFactory {
     /// Initialize the factory with an admin address.
     /// Must be called once after deployment.
     pub fn initialize(env: Env, admin: Address) {
+        extend_instance_ttl(&env);
         if env.storage().instance().has(&symbol_short!("admin")) {
             panic!("already initialized");
         }
@@ -72,6 +75,7 @@ impl AgentWalletFactory {
     /// # Returns
     /// The agent ID (incrementing counter)
     pub fn create_agent(env: Env, owner: Address, agent_address: Address, name: String) -> u64 {
+        extend_instance_ttl(&env);
         // Require the owner to authorize this call
         owner.require_auth();
 
@@ -111,11 +115,11 @@ impl AgentWalletFactory {
 
         // Emit creation event
         env.events().publish(
-            (symbol_short!("factory"), symbol_short!("created")),
+            (symbol_short!("agent"), symbol_short!("created")),
             (agent_id, agent_address, owner),
         );
         env.events().publish(
-            (symbol_short!("state"), symbol_short!("agent")),
+            (symbol_short!("agent"), symbol_short!("state")),
             (agent_id, agent),
         );
 
@@ -124,6 +128,7 @@ impl AgentWalletFactory {
 
     /// Deactivate an agent. Only the owner can deactivate their agent.
     pub fn deactivate_agent(env: Env, owner: Address, agent_id: u64) {
+        extend_instance_ttl(&env);
         owner.require_auth();
 
         let mut agents: Map<u64, AgentInfo> = env
@@ -145,17 +150,18 @@ impl AgentWalletFactory {
             .set(&symbol_short!("agents"), &agents);
 
         env.events().publish(
-            (symbol_short!("factory"), symbol_short!("deactiv")),
+            (symbol_short!("agent"), symbol_short!("deactiv")),
             (agent_id, owner),
         );
         env.events().publish(
-            (symbol_short!("state"), symbol_short!("agent")),
+            (symbol_short!("agent"), symbol_short!("state")),
             (agent_id, agent),
         );
     }
 
     /// Reactivate a previously deactivated agent.
     pub fn reactivate_agent(env: Env, owner: Address, agent_id: u64) {
+        extend_instance_ttl(&env);
         owner.require_auth();
 
         let mut agents: Map<u64, AgentInfo> = env
@@ -177,11 +183,11 @@ impl AgentWalletFactory {
             .set(&symbol_short!("agents"), &agents);
 
         env.events().publish(
-            (symbol_short!("factory"), symbol_short!("reactiv")),
+            (symbol_short!("agent"), symbol_short!("reactiv")),
             (agent_id, owner),
         );
         env.events().publish(
-            (symbol_short!("state"), symbol_short!("agent")),
+            (symbol_short!("agent"), symbol_short!("state")),
             (agent_id, agent),
         );
     }
@@ -189,6 +195,7 @@ impl AgentWalletFactory {
     /// Increment the operation counter for an agent.
     /// Called by the PaymentChannel contract after a successful payment.
     pub fn record_operation(env: Env, agent_id: u64) {
+        extend_instance_ttl(&env);
         let mut agents: Map<u64, AgentInfo> = env
             .storage()
             .instance()
@@ -202,7 +209,7 @@ impl AgentWalletFactory {
             .instance()
             .set(&symbol_short!("agents"), &agents);
         env.events().publish(
-            (symbol_short!("state"), symbol_short!("agent")),
+            (symbol_short!("agent"), symbol_short!("state")),
             (agent_id, agent),
         );
     }
@@ -211,6 +218,7 @@ impl AgentWalletFactory {
 
     /// Get agent info by ID
     pub fn get_agent(env: Env, agent_id: u64) -> AgentInfo {
+        extend_instance_ttl(&env);
         let agents: Map<u64, AgentInfo> = env
             .storage()
             .instance()
@@ -222,6 +230,7 @@ impl AgentWalletFactory {
 
     /// Get all agents owned by a specific address
     pub fn get_agents_by_owner(env: Env, owner: Address) -> Vec<AgentInfo> {
+        extend_instance_ttl(&env);
         let agents: Map<u64, AgentInfo> = env
             .storage()
             .instance()
@@ -248,6 +257,7 @@ impl AgentWalletFactory {
 
     /// Total number of agents ever created
     pub fn total_agents(env: Env) -> u64 {
+        extend_instance_ttl(&env);
         env.storage()
             .instance()
             .get(&symbol_short!("count"))
@@ -256,6 +266,7 @@ impl AgentWalletFactory {
 
     /// Check if a specific address is a registered active agent
     pub fn is_active_agent(env: Env, address: Address) -> bool {
+        extend_instance_ttl(&env);
         let agents: Map<u64, AgentInfo> = env
             .storage()
             .instance()
@@ -281,6 +292,7 @@ impl AgentWalletFactory {
 
     /// Get the contract admin
     pub fn admin(env: Env) -> Address {
+        extend_instance_ttl(&env);
         env.storage()
             .instance()
             .get(&symbol_short!("admin"))

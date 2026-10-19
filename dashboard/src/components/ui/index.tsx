@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion';
 import { clsx } from 'clsx';
 import type { ReactNode } from 'react';
+import type { ContractAddress } from '@sa/core';
 import { pctNumber, clamp100 } from '../../lib/deterministic-math.js';
+import type { AgentInfo } from '@stellaragent/core';
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 
@@ -99,12 +101,12 @@ interface StatCardProps {
 export function StatCard({ label, value, sub, trend, trendValue, icon, accent }: StatCardProps) {
   return (
     <Card>
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3 min-w-0">
         <div className="flex-1">
           <p className="label mb-2">{label}</p>
           <p
             className={clsx(
-              'font-display text-2xl font-semibold',
+              'font-display text-xl sm:text-2xl font-semibold break-words',
               accent ? 'text-sa-accent' : 'text-sa-text',
             )}
           >
@@ -134,7 +136,7 @@ export function StatCard({ label, value, sub, trend, trendValue, icon, accent }:
 
 // ─── AddressChip ──────────────────────────────────────────────────────────────
 
-export function AddressChip({ address }: { address: string }) {
+export function AddressChip({ address }: { address: ContractAddress }) {
   const short = `${address.slice(0, 4)}…${address.slice(-4)}`;
   return (
     <span
@@ -157,13 +159,78 @@ interface SectionHeaderProps {
 
 export function SectionHeader({ title, subtitle, action }: SectionHeaderProps) {
   return (
-    <div className="flex items-center justify-between mb-5">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
       <div>
         <h2 className="section-title">{title}</h2>
         {subtitle && <p className="text-xs text-sa-text-dim mt-0.5">{subtitle}</p>}
       </div>
-      {action && <div>{action}</div>}
+      {action && <div className="flex-shrink-0">{action}</div>}
     </div>
+  );
+}
+
+// ─── AgentList ────────────────────────────────────────────────────────────────
+
+interface AgentListProps {
+  agents: AgentInfo[];
+  isActive?: (address: string) => boolean;
+  onSelect?: (agent: AgentInfo) => void;
+  emptyMessage?: string;
+}
+
+export function AgentList({
+  agents,
+  isActive,
+  onSelect,
+  emptyMessage = 'No agents found for this owner.',
+}: AgentListProps) {
+  if (agents.length === 0) {
+    return <EmptyState message={emptyMessage} />;
+  }
+
+  return (
+    <ul className="flex flex-col gap-2">
+      {agents.map((agent) => {
+        const active = isActive ? isActive(agent.address) : agent.active;
+        return (
+          <li
+            key={agent.address}
+            className={clsx(
+              'flex items-center justify-between rounded border border-sa-border bg-sa-surface/60 px-3 py-2',
+              onSelect && 'cursor-pointer hover:border-sa-accent/40 transition-colors',
+            )}
+            onClick={onSelect ? () => onSelect(agent) : undefined}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <StatusDot status={active ? 'active' : 'inactive'} />
+              <div className="min-w-0">
+                <p className="text-sm text-sa-text truncate">{agent.name ?? 'Unnamed agent'}</p>
+                <AddressChip address={agent.address} />
+              </div>
+            </div>
+            <Badge variant={active ? 'success' : 'neutral'}>
+              {active ? 'active' : 'inactive'}
+            </Badge>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+// ─── TotalAgentsBadge ─────────────────────────────────────────────────────────
+
+interface TotalAgentsBadgeProps {
+  total: number;
+  label?: string;
+}
+
+export function TotalAgentsBadge({ total, label = 'agents' }: TotalAgentsBadgeProps) {
+  return (
+    <Badge variant="info" size="md">
+      <span className="font-mono">{total}</span>
+      <span>{label}</span>
+    </Badge>
   );
 }
 
@@ -171,11 +238,32 @@ export function SectionHeader({ title, subtitle, action }: SectionHeaderProps) {
 
 export function EmptyState({ message }: { message: string }) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-sa-text-dim">
+    <div className="flex flex-col items-center justify-center py-12 px-4 text-center text-sa-text-dim">
       <div className="w-12 h-12 rounded-full border border-sa-border flex items-center justify-center mb-3">
         <span className="text-xl">∅</span>
       </div>
       <p className="text-sm">{message}</p>
+    </div>
+  );
+}
+
+// ─── CostEstimate ─────────────────────────────────────────────────────────────
+
+interface CostEstimateProps {
+  minResourceFee?: string;
+  cpuInsns?: string;
+  memBytes?: string;
+  simulateOnly?: boolean;
+}
+
+export function CostEstimate({ minResourceFee, cpuInsns, memBytes, simulateOnly }: CostEstimateProps) {
+  if (!minResourceFee && !cpuInsns && !memBytes) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs text-sa-text-dim">
+      {simulateOnly && <Badge variant="info">simulation</Badge>}
+      {minResourceFee && <span className="font-mono">fee: {minResourceFee}</span>}
+      {cpuInsns && <span className="font-mono">cpu: {cpuInsns}</span>}
+      {memBytes && <span className="font-mono">mem: {memBytes}</span>}
     </div>
   );
 }
@@ -203,7 +291,7 @@ export function ProgressBar({ value, max = 100, label, showPercent, danger }: Pr
   return (
     <div className="w-full">
       {(label || showPercent) && (
-        <div className="flex justify-between mb-1">
+        <div className="flex justify-between gap-2 mb-1">
           {label && <span className="text-xs text-sa-text-dim">{label}</span>}
           {showPercent && (
             <span className={clsx('text-xs font-mono', isHigh || danger ? 'text-sa-yellow' : 'text-sa-text-dim')}>
